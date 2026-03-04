@@ -1,6 +1,6 @@
 # Kafka: The Power Rangers Factory (or How to Tame Data Chaos)
 
-**Author:** Adi
+**Author:** Ivan Perea , Antonio Defez
 **Date:** 2026-02-17
 **Tags:** data-engineering, apache-kafka, backend, distributed-systems, tech-explained
 
@@ -12,19 +12,49 @@ If you work in tech, you've almost certainly heard of Apache Kafka. But if you t
 
 Today we're going to explain what Kafka is using a **Power Rangers factory** and a team of very efficient monkeys. But instead of just listing concepts, we're going to start with a real problem and let the solution reveal itself — because that's exactly how Kafka came to exist.
 
+Our goal is simple: produce perfectly assembled Power Rangers.
+
+![The final goal: a perfectly assembled Power Ranger](./images/kafka-factory/full-power-ranger.png)
+
 ## The Factory
 
-Welcome to the factory. Our job is to assemble Power Rangers action figures — each one built from **3 parts** that must be placed in strict order:
+Welcome to the factory. Our job is to assemble Power Rangers action figures. In the world of data, a "Message" or "Event" is like one of these pieces. To have a **complete business object** (a finished Ranger), we need all its parts in the right state:
 
 1. **Legs** (the base)
 2. **Torso** (the body)
 3. **Head** (the top)
 
-You cannot place the torso before the legs are in the slot. You cannot place the head before the torso is in place. A part that arrives out of order? **Discarded. Permanently.**
+![Individual pieces needed for assembly](./images/kafka-factory/power-ranger-pieces.png)
+
+A Ranger is only "valid" if it's fully assembled. If a piece is missing (like a Ranger without a head), we have **incomplete data** — we can't ship it, and it just takes up space in our memory (or workbench).
+
+![A complete Ranger vs an incomplete, useless one](./images/kafka-factory/power-ranger-minus-piece.png)
+
+### The Rule of Order
+
+In our factory, there's a strict physical constraint: **you cannot build from the top down.** You can't put a torso in the air if there are no legs to hold it. 
+
+- **Legs** must arrive FIRST.
+- **Torso** must arrive SECOND.
+- **Head** must arrive THIRD.
+
+If parts arrive out of order (e.g., Head -> Legs -> Torso), the monkey doesn't know what to do with them. A torso arriving before the legs? **Discarded.** A head before the torso? **Trash.** 
+
+![The disaster of parts arriving in the wrong order](./images/kafka-factory/power-ranger-incorrect-order.png)
+
+> In Kafka terms, this belt is a **Topic** — a channel where all incoming data (messages) lands. Our goal is to ensure that for every "Ranger ID", the parts arrive at the worker in the exact order they were created.
 
 Right now we produce two models: the **Red Ranger** and the **Blue Ranger**.
 
-![The two figure types and their three assembly pieces](./images/kafka-factory/01-figures.png)
+![The two figure types and their assembly pieces](./images/kafka-factory/01-figures.png)
+
+## Order Is Sacred (The Log)
+
+Before we start the engines, there is one rule that never changes: the belt is a **sequential log**. Once a part is placed on the belt, it stays there. Its position is fixed. It doesn't jump over other parts, and it doesn't vanish.
+
+![Comparison: Order vs Chaos within a partition](./images/kafka-factory/power-ranger-comparation.png)
+
+In Kafka, this is the **ordering guarantee**. When a message lands in a Topic, its position (the **Offset**) is immutable. This is what allows us to reconstruct the state of a Ranger even if we have to stop and restart: we just follow the belt from where we left off.
 
 Parts for both arrive on a single conveyor belt — mixed together, in no particular order. Red legs, blue torsos, red heads, blue legs — all jumbled up.
 
@@ -92,14 +122,6 @@ Monkey 1 only ever sees Red parts, in order. Monkey 2 only ever sees Blue parts,
 ![Each worker assembles its own type — clean, ordered, no racing](./images/kafka-factory/09-broker-partitions-working.png)
 
 In the real world, this Sorting Monkey is the **Broker** and the color is the **Partition Key**. Thanks to him, data gets instantly organized into **Partitions** (the colored belts).
-
-## Order Is Sacred
-
-Here's the critical guarantee: the parts on Belt 1 (the red one) are in the **exact order** they arrived. If the red legs came in before the red torso, that's how they'll appear. No jumps, no disorder.
-
-In Kafka this is called the **per-partition ordering guarantee** — once a message is written to a partition, its position is immutable. It cannot be changed or reordered.
-
-> Ordering is guaranteed **within** a partition, not across partitions. Red parts are in order. Blue parts are in order. But Red and Blue parts are on different belts — their relative ordering doesn't matter.
 
 ## A New Challenge: The Green Ranger
 
